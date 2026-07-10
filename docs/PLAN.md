@@ -43,8 +43,11 @@ after each phase we pause, review, and answer open questions before continuing.
 - [x] **Phase 1 — Repo & masking core.** Monorepo scaffold, plan, Makefile, kind
       config, and the dependency-free `pkg/masking` library proven by `go test`
       (tokens, phones, IDs, cards, IBANs, emails, SSNs cannot appear unmasked).
-- [ ] **Phase 2 — Go services.** gateway → orders → worker, PostgreSQL,
-      RabbitMQ; shared `logging`, `config`, `httpmw`, `amqp` packages.
+- [x] **Phase 2 — Go services.** gateway → orders → worker, PostgreSQL,
+      RabbitMQ; shared `logging`, `config`, `httpmw`, `metrics`, `amqp`,
+      `postgres` packages. Verified end-to-end via `scripts/smoke.sh`: a real
+      order flows gateway→orders→queue→worker→Postgres (pending→paid), invalid
+      tokens raise security-stream auth events, and no unmasked PII reaches logs.
 - [ ] **Phase 3 — OpenTelemetry.** OTel SDK in all services; trace propagation
       across HTTP and the queue; OTel Collector + Tempo.
 - [ ] **Phase 4 — Containerize & kind.** Dockerfiles, image build, load to kind.

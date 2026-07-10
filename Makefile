@@ -1,5 +1,9 @@
-SHELL := /bin/bash
-GO    ?= go
+SHELL       := /bin/bash
+GO          ?= go
+SERVICES    := gateway orders worker
+IMAGE_PREFIX ?= obs-lab
+IMAGE_TAG   ?= dev
+KIND_CLUSTER ?= obs-lab
 
 .PHONY: help
 help: ## Show this help
@@ -22,9 +26,12 @@ tidy: ## Sync go.mod/go.sum (needs network)
 vet: ## go vet
 	$(GO) vet ./...
 
-.PHONY: tools
-tools: ## Install kind/kubectl/helm/terraform (Phase 4)
-	@echo "Phase 4 target — installs cluster tooling"
+.PHONY: images
+images: ## Build a container image for every service
+	@for svc in $(SERVICES); do \
+		echo ">> building $(IMAGE_PREFIX)/$$svc:$(IMAGE_TAG)"; \
+		docker build --build-arg SERVICE=$$svc -t $(IMAGE_PREFIX)/$$svc:$(IMAGE_TAG) . || exit 1; \
+	done
 
 .PHONY: kind-up
 kind-up: ## Create the local kind cluster
@@ -32,4 +39,11 @@ kind-up: ## Create the local kind cluster
 
 .PHONY: kind-down
 kind-down: ## Delete the local kind cluster
-	kind delete cluster --name obs-lab
+	kind delete cluster --name $(KIND_CLUSTER)
+
+.PHONY: kind-load
+kind-load: ## Load all service images into the kind cluster
+	@for svc in $(SERVICES); do \
+		echo ">> loading $(IMAGE_PREFIX)/$$svc:$(IMAGE_TAG) into kind"; \
+		kind load docker-image $(IMAGE_PREFIX)/$$svc:$(IMAGE_TAG) --name $(KIND_CLUSTER) || exit 1; \
+	done

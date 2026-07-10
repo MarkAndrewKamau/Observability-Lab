@@ -77,6 +77,30 @@ func (c *Client) Consume(ctx context.Context, h Handler) error {
 	}
 }
 
+// HeaderCarrier adapts an AMQP headers table to the OpenTelemetry
+// TextMapCarrier interface, so the W3C traceparent can be injected on publish
+// and extracted on consume — this is what stitches the queue hop into the trace.
+type HeaderCarrier amqp.Table
+
+func (c HeaderCarrier) Get(key string) string {
+	if v, ok := c[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func (c HeaderCarrier) Set(key, value string) { c[key] = value }
+
+func (c HeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c))
+	for k := range c {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // Close tears down the channel and connection.
 func (c *Client) Close() error {
 	if c.ch != nil {

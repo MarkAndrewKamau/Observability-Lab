@@ -19,12 +19,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
 
 	amqpc "github.com/markandrewkamau/observability-lab/pkg/amqp"
 	"github.com/markandrewkamau/observability-lab/pkg/config"
 	"github.com/markandrewkamau/observability-lab/pkg/logging"
 	"github.com/markandrewkamau/observability-lab/pkg/metrics"
 	"github.com/markandrewkamau/observability-lab/pkg/postgres"
+	"github.com/markandrewkamau/observability-lab/pkg/telemetry"
 )
 
 type orderEvent struct {
@@ -39,6 +41,12 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	shutdownTracing, err := telemetry.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	if err != nil {
+		log.Error("tracing init failed", "err", err.Error())
+	}
+	defer func() { _ = shutdownTracing(context.Background()) }()
 
 	db, err := postgres.Connect(ctx, cfg.PostgresDSN)
 	if err != nil {
@@ -92,6 +100,13 @@ type processor struct {
 
 func (p *processor) handle(ctx context.Context, d amqp.Delivery) error {
 	start := time.Now()
+
+	// Continue the trace that began in the gateway: extract the traceparent the
+	// orders service injected into the message headers, then open a child span.
+	ctx = otel.GetTextMapPropagator().Extract(ctx, amqpc.HeaderCarrier(d.Headers))
+	ctx, span := otel.Tracer("worker").Start(ctx, "process order.created")
+	defer span.End()
+
 	var evt orderEvent
 	if err := json.Unmarshal(d.Body, &evt); err != nil {
 		p.log.Error("bad message", "err", err.Error())

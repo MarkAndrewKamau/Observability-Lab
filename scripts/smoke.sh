@@ -13,6 +13,7 @@ mkdir -p "$LOGDIR"
 export POSTGRES_DSN="postgres://obs:obs@localhost:5433/obs?sslmode=disable"
 export AMQP_URL="amqp://obs:obs@localhost:5672/"
 export AUTH_TOKEN="dev-secret-token"
+export OTLP_ENDPOINT="localhost:4318" # OTel Collector OTLP/HTTP
 
 go build -o bin/orders ./services/orders/cmd || exit 1
 go build -o bin/gateway ./services/gateway/cmd || exit 1
@@ -37,10 +38,12 @@ done
 echo "== services healthy =="
 
 echo "== 1) valid order =="
-curl -s -X POST http://localhost:8080/api/orders \
+body=$(curl -s -D "$LOGDIR/headers.txt" -X POST http://localhost:8080/api/orders \
   -H "Authorization: Bearer dev-secret-token" -H "Content-Type: application/json" \
-  -d '{"customer_id":"cust-123","amount_cents":4999,"currency":"USD","card_number":"4111 1111 1111 1111","phone":"+254712345678"}'
-echo
+  -d '{"customer_id":"cust-123","amount_cents":4999,"currency":"USD","card_number":"4111 1111 1111 1111","phone":"+254712345678"}')
+echo "$body"
+TRACE_ID=$(grep -i '^Trace-Id:' "$LOGDIR/headers.txt" | tr -d '\r' | awk '{print $2}')
+echo "trace_id=$TRACE_ID"
 
 echo "== 2) invalid token (expect 401 + security event) =="
 curl -s -o /dev/null -w "http_status=%{http_code}\n" -X POST http://localhost:8080/api/orders \
@@ -57,6 +60,21 @@ if grep -REq '4111 1111 1111 1111|254712345678' "$LOGDIR"; then
 else
   echo "PASS: no unmasked card/phone in any log"
 fi
+
+echo "== 5) distributed trace spans gateway -> orders -> worker (Tempo) =="
+trace=""
+for i in $(seq 1 15); do
+  trace=$(curl -s "http://localhost:3200/api/traces/$TRACE_ID" 2>/dev/null)
+  echo "$trace" | grep -q '"stringValue":"gateway"' && break
+  sleep 1
+done
+for svc in gateway orders worker; do
+  if echo "$trace" | grep -q "\"stringValue\":\"$svc\""; then
+    echo "PASS: span from $svc present in trace $TRACE_ID"
+  else
+    echo "FAIL: no span from $svc in trace $TRACE_ID"
+  fi
+done
 
 echo "== auth events (security stream) =="
 grep -h '"stream":"security"' "$LOGDIR/gateway.log"

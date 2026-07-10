@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
 
 	amqpc "github.com/markandrewkamau/observability-lab/pkg/amqp"
 	"github.com/markandrewkamau/observability-lab/pkg/config"
@@ -26,6 +27,7 @@ import (
 	"github.com/markandrewkamau/observability-lab/pkg/logging"
 	"github.com/markandrewkamau/observability-lab/pkg/metrics"
 	"github.com/markandrewkamau/observability-lab/pkg/postgres"
+	"github.com/markandrewkamau/observability-lab/pkg/telemetry"
 )
 
 type createOrderReq struct {
@@ -63,6 +65,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	shutdownTracing, err := telemetry.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	if err != nil {
+		log.Error("tracing init failed", "err", err.Error())
+	}
+	defer func() { _ = shutdownTracing(context.Background()) }()
+
 	db, err := postgres.Connect(ctx, cfg.PostgresDSN)
 	if err != nil {
 		log.Error("postgres connect failed", "err", err.Error())
@@ -81,7 +89,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("POST /orders", httpmw.Chain(http.HandlerFunc(s.handleCreate),
-		httpmw.Recover(log), httpmw.Observe(log, m, "/orders")))
+		httpmw.Trace("POST /orders"), httpmw.Recover(log), httpmw.Observe(log, m, "/orders")))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
 	mux.Handle("GET /metrics", m.Handler())
 
@@ -136,8 +144,15 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	evt, _ := json.Marshal(orderEvent{OrderID: orderID, AmountCents: req.AmountCents})
-	// Headers table is where Phase 3 injects the traceparent.
-	if err := s.pub.Publish(r.Context(), evt, amqp.Table{}); err != nil {
+
+	// Start a producer span and inject the W3C traceparent into the AMQP
+	// headers so the worker can continue this exact trace across the queue.
+	pctx, span := otel.Tracer("orders").Start(r.Context(), "publish order.created")
+	headers := amqp.Table{}
+	otel.GetTextMapPropagator().Inject(pctx, amqpc.HeaderCarrier(headers))
+	err = s.pub.Publish(pctx, evt, headers)
+	span.End()
+	if err != nil {
 		s.log.Error("publish failed", "order_id", orderID, "err", err.Error())
 		s.fail(w, "order_create", http.StatusInternalServerError, "queue error")
 		return

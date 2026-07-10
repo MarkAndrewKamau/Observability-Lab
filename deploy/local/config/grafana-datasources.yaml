@@ -1,0 +1,10 @@
+# Auto-provisioned Grafana datasources for the local stack. Prometheus and Loki
+# are added in later phases; Tempo is here so traces are viewable now.
+apiVersion: 1
+datasources:
+  - name: Tempo
+    type: tempo
+    access: proxy
+    uid: tempo
+    url: http://tempo:3200
+    isDefault: true

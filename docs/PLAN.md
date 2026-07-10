@@ -53,7 +53,10 @@ after each phase we pause, review, and answer open questions before continuing.
       over HTTP (otelhttp) and injected into/extracted from RabbitMQ headers.
       OTel Collector + Tempo + Grafana in compose. Verified: `scripts/smoke.sh`
       asserts one trace spans gateway → orders → worker.
-- [ ] **Phase 4 — Containerize & kind.** Dockerfiles, image build, load to kind.
+- [x] **Phase 4 — Containerize & kind.** One multi-stage `Dockerfile`
+      (distroless, non-root, static, ~7 MB images) parameterized by `SERVICE`;
+      `make images` + `make kind-load`. 3-node kind cluster up; images loaded and
+      verified runnable in-cluster (gateway pod reaches Running/"listening").
 - [ ] **Phase 5 — Terraform + Helm.** kube-prometheus-stack, Loki, Tempo, and
       the app umbrella chart, driven by Terraform with dev/prod values.
 - [ ] **Phase 6 — Metrics, Grafana, Alertmanager.** RED metrics, dashboards.

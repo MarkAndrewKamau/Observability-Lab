@@ -13,12 +13,14 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
+    # Host ports are offset (18080/13000) so the cluster can run alongside the
+    # local docker-compose dev stack, which already uses 8080/3000.
     extraPortMappings:
       - containerPort: 30080   # gateway NodePort
-        hostPort: 8080
+        hostPort: 18080
         protocol: TCP
       - containerPort: 30030   # Grafana NodePort
-        hostPort: 3000
+        hostPort: 13000
         protocol: TCP
   - role: worker
   - role: worker

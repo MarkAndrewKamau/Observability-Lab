@@ -48,8 +48,11 @@ after each phase we pause, review, and answer open questions before continuing.
       `postgres` packages. Verified end-to-end via `scripts/smoke.sh`: a real
       order flows gateway→orders→queue→worker→Postgres (pending→paid), invalid
       tokens raise security-stream auth events, and no unmasked PII reaches logs.
-- [ ] **Phase 3 — OpenTelemetry.** OTel SDK in all services; trace propagation
-      across HTTP and the queue; OTel Collector + Tempo.
+- [x] **Phase 3 — OpenTelemetry.** `pkg/telemetry` (OTLP/HTTP exporter, W3C
+      propagators); gateway/orders/worker instrumented; traceparent propagated
+      over HTTP (otelhttp) and injected into/extracted from RabbitMQ headers.
+      OTel Collector + Tempo + Grafana in compose. Verified: `scripts/smoke.sh`
+      asserts one trace spans gateway → orders → worker.
 - [ ] **Phase 4 — Containerize & kind.** Dockerfiles, image build, load to kind.
 - [ ] **Phase 5 — Terraform + Helm.** kube-prometheus-stack, Loki, Tempo, and
       the app umbrella chart, driven by Terraform with dev/prod values.

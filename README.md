@@ -14,14 +14,16 @@ routing to Wazuh, and provable PII masking.
 |---|---|
 | 1 — Repo & masking core | ✅ done |
 | 2 — Go services | ✅ done |
-| 3 — OpenTelemetry tracing | ⏳ next |
-| 4–11 | ⬜ planned |
+| 3 — OpenTelemetry tracing | ✅ done |
+| 4 — Containerize & kind | ⏳ next |
+| 5–11 | ⬜ planned |
 
-Run the end-to-end demo locally:
+Run the end-to-end demo locally (services + tracing):
 
 ```bash
-docker compose -f deploy/local/docker-compose.dev.yml up -d postgres rabbitmq
-bash scripts/smoke.sh   # drives gateway→orders→queue→worker→Postgres
+docker compose -f deploy/local/docker-compose.dev.yml up -d   # pg, rabbit, tempo, collector, grafana
+bash scripts/smoke.sh   # drives gateway→orders→queue→worker→Postgres and asserts one trace across all three
+# View the trace in Grafana → Explore → Tempo at http://localhost:3000
 ```
 
 ## Layout

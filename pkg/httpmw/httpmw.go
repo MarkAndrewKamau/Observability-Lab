@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/markandrewkamau/observability-lab/pkg/metrics"
 )
 
@@ -28,6 +30,15 @@ func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler 
 		h = mws[i](h)
 	}
 	return h
+}
+
+// Trace starts a server span for each request (extracting any incoming
+// traceparent) using the OpenTelemetry global provider. Use it as the outermost
+// middleware so the span encloses the whole handler.
+func Trace(route string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(next, route)
+	}
 }
 
 // Recover converts panics into 500s and an error log rather than crashing.

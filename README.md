@@ -13,8 +13,16 @@ routing to Wazuh, and provable PII masking.
 | Phase | State |
 |---|---|
 | 1 — Repo & masking core | ✅ done |
-| 2 — Go services | ⏳ next |
-| 3–11 | ⬜ planned |
+| 2 — Go services | ✅ done |
+| 3 — OpenTelemetry tracing | ⏳ next |
+| 4–11 | ⬜ planned |
+
+Run the end-to-end demo locally:
+
+```bash
+docker compose -f deploy/local/docker-compose.dev.yml up -d postgres rabbitmq
+bash scripts/smoke.sh   # drives gateway→orders→queue→worker→Postgres
+```
 
 ## Layout
 

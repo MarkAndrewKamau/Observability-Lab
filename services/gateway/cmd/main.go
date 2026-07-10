@@ -19,10 +19,14 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/markandrewkamau/observability-lab/pkg/config"
 	"github.com/markandrewkamau/observability-lab/pkg/httpmw"
 	"github.com/markandrewkamau/observability-lab/pkg/logging"
 	"github.com/markandrewkamau/observability-lab/pkg/metrics"
+	"github.com/markandrewkamau/observability-lab/pkg/telemetry"
 )
 
 type server struct {
@@ -38,22 +42,33 @@ func main() {
 	log := logging.New(cfg.ServiceName, cfg.LogLevel)
 	m := metrics.New(cfg.ServiceName)
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	shutdownTracing, err := telemetry.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	if err != nil {
+		log.Error("tracing init failed", "err", err.Error())
+	}
+	defer func() { _ = shutdownTracing(context.Background()) }()
+
 	s := &server{
 		cfg:    cfg,
 		log:    log,
 		seclog: logging.Security(log),
 		m:      m,
-		client: &http.Client{Timeout: 5 * time.Second},
+		// otelhttp transport injects the traceparent into the outbound
+		// gateway -> orders request.
+		client: &http.Client{
+			Timeout:   5 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		},
 	}
 
 	mux := http.NewServeMux()
 	mux.Handle("POST /api/orders", httpmw.Chain(http.HandlerFunc(s.handleOrder),
-		httpmw.Recover(log), httpmw.Observe(log, m, "/api/orders")))
+		httpmw.Trace("POST /api/orders"), httpmw.Recover(log), httpmw.Observe(log, m, "/api/orders")))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
 	mux.Handle("GET /metrics", m.Handler())
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
@@ -72,6 +87,12 @@ func main() {
 }
 
 func (s *server) handleOrder(w http.ResponseWriter, r *http.Request) {
+	// Surface the trace id so callers (and the smoke test) can find the trace
+	// in Tempo.
+	if sc := trace.SpanContextFromContext(r.Context()); sc.HasTraceID() {
+		w.Header().Set("Trace-Id", sc.TraceID().String())
+	}
+
 	if !s.authenticate(r) {
 		// Security-stream event: unauthorized attempt (routed to Wazuh).
 		s.seclog.Warn("authentication failed",

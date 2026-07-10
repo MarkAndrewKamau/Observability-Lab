@@ -1,0 +1,25 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars.local
+.terraform.lock.hcl
+
+# Secrets / local overrides
+*.local.yaml
+*.local.env
+.env
+kubeconfig*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

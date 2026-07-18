@@ -1,0 +1,64 @@
+{{- $svc := .Values.services.gateway -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    {{- include "app.selectorLabels" (dict "svc" "gateway" "root" .) | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" (dict "svc" "gateway" "root" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+        {{- include "app.selectorLabels" (dict "svc" "gateway" "root" .) | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532 # distroless nonroot uid (named user can't be verified)
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}/gateway:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: {{ $svc.httpPort }} }
+          env:
+            - { name: HTTP_ADDR, value: ":{{ $svc.httpPort }}" }
+            - { name: ORDERS_URL, value: "http://{{ .Release.Name }}-orders:{{ .Values.services.orders.httpPort }}" }
+          envFrom:
+            - configMapRef: { name: {{ .Release.Name }}-config }
+            - secretRef: { name: {{ .Release.Name }}-secrets }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 2
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+          resources: {{- toYaml $svc.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    {{- include "app.selectorLabels" (dict "svc" "gateway" "root" .) | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    {{- include "app.selectorLabels" (dict "svc" "gateway" "root" .) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $svc.httpPort }}
+      targetPort: http
+      nodePort: {{ $svc.nodePort }}

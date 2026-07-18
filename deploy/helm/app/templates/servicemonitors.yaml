@@ -1,0 +1,21 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- range $name, $svc := .Values.services }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "app.labels" $ | nindent 4 }}
+    # kube-prometheus-stack only selects ServiceMonitors carrying its release label.
+    release: {{ $.Values.serviceMonitor.release }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" (dict "svc" $name "root" $) | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+{{- end }}
+{{- end }}

@@ -57,8 +57,14 @@ after each phase we pause, review, and answer open questions before continuing.
       (distroless, non-root, static, ~7 MB images) parameterized by `SERVICE`;
       `make images` + `make kind-load`. 3-node kind cluster up; images loaded and
       verified runnable in-cluster (gateway pod reaches Running/"listening").
-- [ ] **Phase 5 — Terraform + Helm.** kube-prometheus-stack, Loki, Tempo, and
-      the app umbrella chart, driven by Terraform with dev/prod values.
+- [x] **Phase 5 — Terraform + Helm.** Terraform (`environments/{dev,prod}` +
+      shared modules) drives Helm: kube-prometheus-stack, Loki, Tempo, an
+      in-repo datastores chart (Postgres + RabbitMQ), and the app umbrella
+      chart. Verified via `scripts/verify-cluster.sh`: an order driven through
+      the gateway NodePort reaches `paid` in in-cluster Postgres, PII stays
+      masked, and one trace spans gateway→orders→worker in in-cluster Tempo.
+      Note: Bitnami's free chart repo was sunset, so Postgres/RabbitMQ use a
+      small self-contained chart on stock images instead.
 - [ ] **Phase 6 — Metrics, Grafana, Alertmanager.** RED metrics, dashboards.
 - [ ] **Phase 7 — Logging pipeline.** Fluent Bit routing: operational → Loki,
       auth/security → Wazuh.

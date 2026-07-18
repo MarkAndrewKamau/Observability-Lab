@@ -1,0 +1,27 @@
+{{/* Non-sensitive config shared by all services. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+data:
+  ENV: {{ .Values.env | quote }}
+  LOG_LEVEL: {{ .Values.logLevel | quote }}
+  OTLP_ENDPOINT: {{ .Values.otlp.endpoint | quote }}
+  AMQP_QUEUE: {{ .Values.amqp.queue | quote }}
+---
+{{/* Sensitive values: connection strings (with creds) and the auth token.
+     Lab-grade — real deployments would source these from an external secret
+     manager rather than chart values. */}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-secrets
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  AUTH_TOKEN: {{ .Values.authToken | quote }}
+  POSTGRES_DSN: {{ .Values.postgres.dsn | quote }}
+  AMQP_URL: {{ .Values.amqp.url | quote }}

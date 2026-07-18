@@ -1,0 +1,22 @@
+# Lab-grade PostgreSQL and RabbitMQ using stock upstream images (the same ones
+# used by the local docker-compose stack). Single replica; persistence off by
+# default (dev), on for prod. The app's schema is created by the services at
+# startup, so no init scripts are needed here.
+postgres:
+  image: postgres:16-alpine
+  user: obs
+  password: obs
+  database: obs
+  persistence:
+    enabled: false
+    size: 1Gi
+  resources: {}
+
+rabbitmq:
+  image: rabbitmq:3.13-management-alpine
+  user: obs
+  password: obs
+  persistence:
+    enabled: false
+    size: 1Gi
+  resources: {}

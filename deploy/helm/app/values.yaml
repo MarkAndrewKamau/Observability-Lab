@@ -1,0 +1,49 @@
+# Defaults for the obs-lab app chart. Terraform overrides the env-specific
+# bits (replicas, resources, image tag, endpoints) per environment; these
+# defaults let `helm template`/`helm lint` run standalone.
+env: dev
+logLevel: info
+
+image:
+  repository: obs-lab
+  tag: dev
+  pullPolicy: Never # images are side-loaded into kind, never pulled
+
+# Shared secret bearer token for the edge (lab-grade). Overridden per env.
+authToken: dev-secret-token
+
+# In-cluster dependency endpoints (match the Bitnami/Tempo release names).
+postgres:
+  dsn: "postgres://obs:obs@obs-postgres.obs.svc.cluster.local:5432/obs?sslmode=disable"
+amqp:
+  url: "amqp://obs:obs@obs-rabbitmq.obs.svc.cluster.local:5672/"
+  queue: "orders.created"
+otlp:
+  endpoint: "obs-tempo.monitoring.svc.cluster.local:4318"
+
+# Emit Prometheus ServiceMonitors (requires the kube-prometheus-stack CRDs).
+# Enabled in Phase 6; off here so Phase 5 can apply before CRDs exist.
+serviceMonitor:
+  enabled: false
+  release: kube-prometheus-stack
+
+services:
+  gateway:
+    replicas: 1
+    httpPort: 8080
+    nodePort: 30080
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 250m, memory: 128Mi }
+  orders:
+    replicas: 1
+    httpPort: 8081
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 250m, memory: 128Mi }
+  worker:
+    replicas: 1
+    httpPort: 8082
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 250m, memory: 128Mi }

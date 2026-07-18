@@ -1,0 +1,6 @@
+apiVersion: v2
+name: obs-lab-datastores
+description: Self-contained PostgreSQL and RabbitMQ for the observability lab
+type: application
+version: 0.1.0
+appVersion: "1"

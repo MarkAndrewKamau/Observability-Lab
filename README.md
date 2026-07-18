@@ -66,7 +66,7 @@ flowchart TB
         logparser["logparser 🔜<br/>custom Go exporter<br/>parses logs · masks PII"]
     end
 
-    subgraph data["Stateful backends · Bitnami Helm 🔜"]
+    subgraph data["Stateful backends · in-repo Helm chart ✅"]
         pg[("PostgreSQL<br/>orders · card_last4 only")]
         mq{{"RabbitMQ<br/>orders.created queue"}}
     end
@@ -175,7 +175,7 @@ flowchart LR
         kps["kube-prometheus-stack<br/>Prometheus · Grafana · Alertmanager"]
         loki["Loki"]
         tempo["Tempo"]
-        infra["Bitnami postgresql + rabbitmq"]
+        infra["datastores chart<br/>postgres + rabbitmq"]
         appchart["app umbrella chart<br/>gateway · orders · worker"]
     end
 
@@ -203,14 +203,14 @@ flowchart LR
 | `orders` | Go | Order API; persists order (card last-4 only); publishes to queue | ✅ | both |
 | `worker` | Go | Consumes queue, simulates payment, updates status | ✅ | both |
 | `logparser` | Go | Custom exporter: parse logs, mask PII, export metrics | 🔜 P9 | — |
-| PostgreSQL | Bitnami chart | Order storage | 🔜 P5 (local now) | both |
-| RabbitMQ | Bitnami chart | `orders.created` work queue | 🔜 P5 (local now) | both |
-| OTel Collector | otel-collector-contrib | Receive OTLP, export to Tempo | ✅ | local (P5 in-cluster) |
-| Tempo | Grafana Tempo | Trace storage & query | ✅ | local (P5 in-cluster) |
-| Prometheus | kube-prometheus-stack | Metrics scrape & storage, recording/alert rules | 🔜 P5/P6 | in-cluster |
-| Alertmanager | kube-prometheus-stack | SLO burn-rate alert routing | 🔜 P5/P10 | in-cluster |
-| Grafana | kube-prometheus-stack | Dashboards, Explore, RBAC | ✅ local / 🔜 P5 | both |
-| Loki | Grafana Loki | Operational log storage | 🔜 P7 | in-cluster |
+| PostgreSQL | in-repo chart (postgres:16) | Order storage | ✅ | both |
+| RabbitMQ | in-repo chart (rabbitmq:3.13) | `orders.created` work queue | ✅ | both |
+| OTel Collector | otel-collector-contrib | Receive OTLP (local stack) | ✅ | local |
+| Tempo | Grafana Tempo | Trace storage & query | ✅ | both |
+| Prometheus | kube-prometheus-stack | Metrics scrape & storage, recording/alert rules | ✅ (scrape wiring P6) | in-cluster |
+| Alertmanager | kube-prometheus-stack | SLO burn-rate alert routing | ✅ (rules P10) | in-cluster |
+| Grafana | kube-prometheus-stack | Dashboards, Explore, RBAC | ✅ | both |
+| Loki | Grafana Loki | Operational log storage | ✅ (shipping P7) | in-cluster |
 | Fluent Bit | Fluent Bit | Log shipping, routing by `stream` | 🔜 P7 | in-cluster |
 | Wazuh | Wazuh | Security/auth event SIEM | 🔜 P8 | in-cluster |
 
@@ -391,8 +391,8 @@ Full detail and current status live in **[docs/PLAN.md](docs/PLAN.md)**.
 | 2 | Go services (gateway/orders/worker) | ✅ |
 | 3 | OpenTelemetry tracing (HTTP + queue) | ✅ |
 | 4 | Containerize & kind | ✅ |
-| 5 | Terraform + Helm (full stack, dev/prod) | 🔜 next |
-| 6 | Metrics, Grafana, Alertmanager | ⬜ |
+| 5 | Terraform + Helm (full stack, dev/prod) | ✅ |
+| 6 | Metrics, Grafana, Alertmanager | 🔜 next |
 | 7 | Fluent Bit logging pipeline → Loki | ⬜ |
 | 8 | Wazuh security events | ⬜ |
 | 9 | Custom Go log exporter | ⬜ |

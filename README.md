@@ -392,8 +392,8 @@ Full detail and current status live in **[docs/PLAN.md](docs/PLAN.md)**.
 | 3 | OpenTelemetry tracing (HTTP + queue) | ✅ |
 | 4 | Containerize & kind | ✅ |
 | 5 | Terraform + Helm (full stack, dev/prod) | ✅ |
-| 6 | Metrics, Grafana, Alertmanager | 🔜 next |
-| 7 | Fluent Bit logging pipeline → Loki | ⬜ |
+| 6 | Metrics, Grafana, Alertmanager | ✅ |
+| 7 | Fluent Bit logging pipeline → Loki | 🔜 next |
 | 8 | Wazuh security events | ⬜ |
 | 9 | Custom Go log exporter | ⬜ |
 | 10 | SLOs & burn-rate alerts | ⬜ |

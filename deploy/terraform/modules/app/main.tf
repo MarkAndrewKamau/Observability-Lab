@@ -25,6 +25,9 @@ resource "helm_release" "app" {
     postgres = { dsn = var.postgres_dsn }
     amqp     = { url = var.amqp_url, queue = var.amqp_queue }
     otlp     = { endpoint = var.otlp_endpoint }
+
+    serviceMonitor = { enabled = var.service_monitor_enabled }
+    loadgen        = { enabled = var.loadgen_enabled }
     services = {
       gateway = { replicas = var.replicas, httpPort = 8080, nodePort = var.gateway_nodeport, resources = var.resources }
       orders  = { replicas = var.replicas, httpPort = 8081, resources = var.resources }

@@ -6,6 +6,10 @@ replicas             = 1
 image_tag            = "dev"
 prometheus_retention = "6h"
 
+# Metrics phase: scrape our services and run a synthetic load generator.
+service_monitor_enabled = true
+loadgen_enabled         = true
+
 app_resources = {
   requests = { cpu = "25m", memory = "32Mi" }
   limits   = { cpu = "250m", memory = "128Mi" }

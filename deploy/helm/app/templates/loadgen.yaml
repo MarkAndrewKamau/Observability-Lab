@@ -1,0 +1,48 @@
+{{- if .Values.loadgen.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-loadgen
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    {{- include "app.selectorLabels" (dict "svc" "loadgen" "root" .) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" (dict "svc" "loadgen" "root" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+        {{- include "app.selectorLabels" (dict "svc" "loadgen" "root" .) | nindent 8 }}
+    spec:
+      containers:
+        - name: loadgen
+          image: {{ .Values.loadgen.image }}
+          # AUTH_TOKEN is read from the app Secret rather than baked into args.
+          envFrom:
+            - secretRef: { name: {{ .Release.Name }}-secrets }
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              url="http://{{ .Release.Name }}-gateway:{{ .Values.services.gateway.httpPort }}/api/orders"
+              echo "loadgen -> $url every {{ .Values.loadgen.intervalSeconds }}s"
+              while true; do
+                curl -s -o /dev/null -X POST "$url" \
+                  -H "Authorization: Bearer $AUTH_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{"customer_id":"loadgen","amount_cents":1299,"currency":"USD","card_number":"4111 1111 1111 1111","phone":"+254712345678"}' || true
+                sleep {{ .Values.loadgen.intervalSeconds }}
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100 # curlimages/curl runs as uid 100
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+{{- end }}

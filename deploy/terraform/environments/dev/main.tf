@@ -39,6 +39,9 @@ module "app" {
   amqp_url      = "amqp://obs:obs@obs-rabbitmq.${local.app_namespace}.svc.cluster.local:5672/"
   otlp_endpoint = "obs-tempo.${local.mon_namespace}.svc.cluster.local:4318"
 
+  service_monitor_enabled = var.service_monitor_enabled
+  loadgen_enabled         = var.loadgen_enabled
+
   # Data stores and Tempo must exist before the app tries to reach them.
   depends_on = [module.datastores, module.observability]
 }

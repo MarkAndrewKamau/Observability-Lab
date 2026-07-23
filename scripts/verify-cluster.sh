@@ -52,3 +52,21 @@ for svc in gateway orders worker; do
     echo "FAIL: no span from $svc in trace $TRACE_ID"
   fi
 done
+
+echo "== 6) Prometheus is scraping our services (targets UP) =="
+kubectl -n "$NS_MON" port-forward svc/kube-prometheus-stack-prometheus 9090:9090 >/tmp/prom-pf.log 2>&1 &
+PP=$!; trap "kill $PF $PP 2>/dev/null" EXIT
+for i in $(seq 1 15); do curl -sf http://localhost:9090/-/ready >/dev/null 2>&1 && break; sleep 1; done
+curl -s "http://localhost:9090/api/v1/targets?state=active" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)['data']['activeTargets']
+for svc in ('gateway','orders','worker'):
+    h=[t['health'] for t in d if svc in t['labels'].get('job','')]
+    print(f'{\"PASS\" if h and all(x==\"up\" for x in h) else \"FAIL\"}: obs-{svc} target {h or \"MISSING\"}')
+"
+echo "== 7) transaction metrics are non-zero =="
+for q in 'sum(transactions_total)' 'sum(queue_consumed_total)'; do
+  v=$(curl -s "http://localhost:9090/api/v1/query?query=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))' "$q")" \
+      | python3 -c "import sys,json;r=json.load(sys.stdin)['data']['result'];print(r[0]['value'][1] if r else '0')")
+  awk -v v="$v" -v q="$q" 'BEGIN{printf "%s: %s = %s\n", (v+0>0?"PASS":"FAIL"), q, v}'
+done

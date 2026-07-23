@@ -54,3 +54,11 @@ variable "amqp_queue" {
 variable "otlp_endpoint" {
   type = string
 }
+variable "service_monitor_enabled" {
+  type    = bool
+  default = false
+}
+variable "loadgen_enabled" {
+  type    = bool
+  default = false
+}

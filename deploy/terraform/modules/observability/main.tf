@@ -3,8 +3,24 @@
 # pre-wired with Tempo and Loki datasources so all three pillars land in one UI.
 terraform {
   required_providers {
-    helm = { source = "hashicorp/helm" }
+    helm       = { source = "hashicorp/helm" }
+    kubernetes = { source = "hashicorp/kubernetes" }
   }
+}
+
+# Provisioned Grafana dashboard: the kube-prometheus-stack Grafana sidecar
+# imports any ConfigMap in its namespace labelled grafana_dashboard=1, so the
+# dashboard is version-controlled and reproducible (no click-ops).
+resource "kubernetes_config_map_v1" "dashboard_obs_lab" {
+  metadata {
+    name      = "obs-lab-dashboard"
+    namespace = var.namespace
+    labels    = { grafana_dashboard = "1" }
+  }
+  data = {
+    "obs-lab.json" = file("${path.module}/dashboards/obs-lab.json")
+  }
+  depends_on = [helm_release.kube_prometheus_stack]
 }
 
 resource "helm_release" "kube_prometheus_stack" {

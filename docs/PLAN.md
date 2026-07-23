@@ -65,7 +65,11 @@ after each phase we pause, review, and answer open questions before continuing.
       masked, and one trace spans gateway→orders→worker in in-cluster Tempo.
       Note: Bitnami's free chart repo was sunset, so Postgres/RabbitMQ use a
       small self-contained chart on stock images instead.
-- [ ] **Phase 6 — Metrics, Grafana, Alertmanager.** RED metrics, dashboards.
+- [x] **Phase 6 — Metrics, Grafana, Alertmanager.** App ServiceMonitors enabled
+      (Prometheus scrapes gateway/orders/worker — targets UP); a provisioned-as-
+      code Grafana dashboard (RED + transaction + queue panels) loaded via the
+      sidecar; an in-cluster load generator drives continuous orders. Verified:
+      `verify-cluster.sh` asserts targets UP and transaction metrics non-zero.
 - [ ] **Phase 7 — Logging pipeline.** Fluent Bit routing: operational → Loki,
       auth/security → Wazuh.
 - [ ] **Phase 8 — Wazuh.** Manager/indexer/dashboard; security event ingestion.

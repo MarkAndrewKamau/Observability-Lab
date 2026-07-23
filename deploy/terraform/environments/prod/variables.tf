@@ -32,6 +32,14 @@ variable "prometheus_retention" {
   type    = string
   default = "6h"
 }
+variable "service_monitor_enabled" {
+  type    = bool
+  default = true
+}
+variable "loadgen_enabled" {
+  type    = bool
+  default = false
+}
 variable "app_resources" {
   type    = any
   default = {}

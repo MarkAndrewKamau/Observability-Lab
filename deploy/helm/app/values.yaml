@@ -22,10 +22,16 @@ otlp:
   endpoint: "obs-tempo.monitoring.svc.cluster.local:4318"
 
 # Emit Prometheus ServiceMonitors (requires the kube-prometheus-stack CRDs).
-# Enabled in Phase 6; off here so Phase 5 can apply before CRDs exist.
 serviceMonitor:
   enabled: false
   release: kube-prometheus-stack
+
+# In-cluster load generator: continuously drives orders through the gateway so
+# dashboards (and later SLO burn-rate alerts) have real signal. Off by default.
+loadgen:
+  enabled: false
+  image: curlimages/curl:8.11.1
+  intervalSeconds: 2
 
 services:
   gateway:

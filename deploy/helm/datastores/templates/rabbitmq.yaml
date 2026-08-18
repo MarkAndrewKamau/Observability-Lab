@@ -36,16 +36,27 @@ spec:
             - { name: management, containerPort: 15672 }
           volumeMounts:
             - { name: data, mountPath: /var/lib/rabbitmq/mnesia }
+          # RabbitMQ takes ~110s to boot on kind and "diagnostics ping" can be
+          # slow under load; without a startupProbe and generous thresholds the
+          # liveness probe times out and kubelet kills it in a restart loop.
+          startupProbe:
+            exec: { command: ["rabbitmq-diagnostics", "-q", "ping"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 30
           readinessProbe:
             exec: { command: ["rabbitmq-diagnostics", "-q", "ping"] }
             initialDelaySeconds: 15
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 6
           livenessProbe:
             exec: { command: ["rabbitmq-diagnostics", "-q", "ping"] }
-            initialDelaySeconds: 40
+            initialDelaySeconds: 60
             periodSeconds: 30
-            timeoutSeconds: 15
+            timeoutSeconds: 30
+            failureThreshold: 6
           resources: {{- toYaml $r.resources | nindent 12 }}
       volumes:
         - name: data

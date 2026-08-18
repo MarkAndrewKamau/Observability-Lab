@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Phase 5 in-cluster verification: proves the full stack deployed by Terraform
-# actually works end-to-end inside kind:
+# Phase 5-7 in-cluster verification: proves the full stack deployed by
+# Terraform actually works end-to-end inside kind:
 #   1. app Deployments become Ready
 #   2. a real order driven through the gateway NodePort reaches 'paid' in the
 #      in-cluster PostgreSQL
 #   3. no unmasked PII appears in any service pod log
 #   4. the distributed trace lands in the in-cluster Tempo
+#   5. Prometheus scrapes gateway/orders/worker and transaction metrics flow
+#   6. Fluent Bit tails every node and ships logs to Loki, routed by the app's
+#      stream field (operational vs security)
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 NS_APP=obs
@@ -70,3 +73,32 @@ for q in 'sum(transactions_total)' 'sum(queue_consumed_total)'; do
       | python3 -c "import sys,json;r=json.load(sys.stdin)['data']['result'];print(r[0]['value'][1] if r else '0')")
   awk -v v="$v" -v q="$q" 'BEGIN{printf "%s: %s = %s\n", (v+0>0?"PASS":"FAIL"), q, v}'
 done
+
+echo "== 8) Fluent Bit DaemonSet ready on every node =="
+kubectl -n "$NS_MON" rollout status ds/fluent-bit --timeout=60s >/dev/null || { echo "FAIL: fluent-bit rollout not complete"; exit 1; }
+fb_ready=$(kubectl -n "$NS_MON" get ds fluent-bit -o jsonpath='{.status.numberAvailable}')
+fb_desired=$(kubectl -n "$NS_MON" get ds fluent-bit -o jsonpath='{.status.desiredNumberScheduled}')
+[ "${fb_ready:-0}" = "${fb_desired:-0}" ] && echo "PASS: fluent-bit $fb_ready/$fb_desired pods ready" \
+  || echo "FAIL: fluent-bit $fb_ready/$fb_desired pods ready"
+
+echo "== 9) logs arrive in Loki, routed by the stream field =="
+kubectl -n "$NS_MON" port-forward svc/loki-gateway 3100:80 >/tmp/loki-pf.log 2>&1 &
+LP=$!; trap "kill $PF $PP $LP 2>/dev/null" EXIT
+for i in $(seq 1 15); do curl -sf http://localhost:3100/ready >/dev/null 2>&1 && break; sleep 1; done
+loki_count() { # $1 = LogQL query; prints matching log lines
+  curl -s --get "http://localhost:3100/loki/api/v1/query_range" \
+    --data-urlencode "query=$1" \
+    --data-urlencode "start=$(date -d '10 min ago' +%s%N)" \
+    --data-urlencode "end=$(date +%s%N)" --data-urlencode "limit=3" \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin)['data']['result']
+print(sum(len(s['values']) for s in d))
+"
+}
+op=$(loki_count '{stream="operational"} |= "creating order"')
+[ "${op:-0}" -gt 0 ] && echo "PASS: $op operational log lines in Loki" \
+  || echo "FAIL: no operational logs in Loki"
+sec=$(loki_count '{stream="security"} |= "authentication"')
+[ "${sec:-0}" -gt 0 ] && echo "PASS: $sec security log lines in Loki" \
+  || echo "FAIL: no security logs in Loki"

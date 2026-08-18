@@ -27,3 +27,7 @@ variable "persistence_enabled" {
   type    = bool
   default = false
 }
+variable "fluent_bit_resources" {
+  type    = any
+  default = {}
+}

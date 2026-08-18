@@ -24,6 +24,7 @@ module "observability" {
   prometheus_retention   = var.prometheus_retention
   prometheus_resources   = var.prometheus_resources
   persistence_enabled    = var.persistence_enabled
+  fluent_bit_resources   = var.fluent_bit_resources
 }
 
 module "app" {

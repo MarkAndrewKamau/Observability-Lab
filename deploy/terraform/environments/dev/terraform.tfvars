@@ -26,3 +26,9 @@ prometheus_resources = {
   requests = { cpu = "100m", memory = "256Mi" }
   limits   = { cpu = "1", memory = "1Gi" }
 }
+
+# Phase 7: Fluent Bit DaemonSet runs on every node (one pod per node).
+fluent_bit_resources = {
+  requests = { cpu = "25m", memory = "64Mi" }
+  limits   = { cpu = "250m", memory = "256Mi" }
+}

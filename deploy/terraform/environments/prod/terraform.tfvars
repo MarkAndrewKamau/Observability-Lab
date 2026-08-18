@@ -27,5 +27,11 @@ prometheus_resources = {
   limits   = { cpu = "2", memory = "2Gi" }
 }
 
+# Fluent Bit DaemonSet: one pod per node; prod-sized but still lean.
+fluent_bit_resources = {
+  requests = { cpu = "50m", memory = "128Mi" }
+  limits   = { cpu = "500m", memory = "512Mi" }
+}
+
 service_monitor_enabled = true
 loadgen_enabled         = false

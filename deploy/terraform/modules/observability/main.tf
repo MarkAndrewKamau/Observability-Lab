@@ -127,3 +127,82 @@ resource "helm_release" "loki" {
     monitoring   = { selfMonitoring = { enabled = false } }
   })]
 }
+
+# Fluent Bit DaemonSet (Phase 7): tails every container's stdout, parses the
+# structured JSON logs and labels them by the "stream" field each service
+# stamps on every line — operational logs go to Loki now; Phase 8 swaps the
+# security stream's sink to Wazuh. The $stream/$service record accessors in
+# the Labels setting promote those JSON fields to Loki stream labels.
+resource "helm_release" "fluent_bit" {
+  name             = "fluent-bit"
+  namespace        = var.namespace
+  create_namespace = true
+  repository       = "https://fluent.github.io/helm-charts"
+  chart            = "fluent-bit"
+  version          = "0.58.1"
+  timeout          = 600
+  depends_on       = [helm_release.loki]
+
+  values = [yamlencode({
+    kind = "DaemonSet"
+    # Also collect logs from the kind control-plane node.
+    tolerations = [{
+      key      = "node-role.kubernetes.io/control-plane"
+      operator = "Exists"
+      effect   = "NoSchedule"
+    }]
+    resources = var.fluent_bit_resources
+
+    config = {
+      # Tail all container stdout files. inotify_watcher Off: kind nodes cap
+      # fs.inotify.max_user_instances at 128 per UID (shared with kubelet and
+      # containerd-shim), and tail's inotify mode exhausts it -> EMFILE crash
+      # at startup ("Too many open files"). Stat polling is fine for a lab.
+      # parser cri-log-key strips the containerd framing (timestamp stream
+      # flag) so the kubernetes filter can JSON-parse the line (Merge_Log).
+      inputs = <<-EOT
+        [INPUT]
+            Name tail
+            Path /var/log/containers/*.log
+            Tag kube.*
+            parser cri-log-key
+            inotify_watcher Off
+            Skip_Long_Lines On
+            Refresh_Interval 5
+      EOT
+      filters = <<-EOT
+        [FILTER]
+            Name kubernetes
+            Match kube.*
+            Merge_Log On
+            Keep_Log Off
+            K8S-Logging.Parser On
+            K8S-Logging.Exclude On
+      EOT
+      outputs = <<-EOT
+        [OUTPUT]
+            Name loki
+            Match *
+            Host loki-gateway.${var.namespace}.svc.cluster.local
+            Port 80
+            Labels job=fluentbit, stream=$stream, service=$service
+            Line_Format json
+            Retry_Limit 3
+      EOT
+      # Fluent Bit 5 renamed the CRI content key to "message", which the
+      # kubernetes filter's Merge_Log (expects "log") never sees; the image's
+      # builtin cri parser also shadows our "stream" field. Define a parser
+      # that emits "log" (name must differ from the builtin "cri" or the
+      # duplicate is fatal in v5).
+      customParsers = <<-EOT
+        [PARSER]
+            Name cri-log-key
+            Format regex
+            Regex ^(?<time>[^ ]+) (?:stdout|stderr) (?:F|P) (?<log>.*)$
+            Time_Key time
+            Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+            Time_Keep On
+      EOT
+    }
+  })]
+}

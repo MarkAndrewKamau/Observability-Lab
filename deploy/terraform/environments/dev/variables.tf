@@ -56,3 +56,7 @@ variable "prometheus_resources" {
   type    = any
   default = {}
 }
+variable "fluent_bit_resources" {
+  type    = any
+  default = {}
+}

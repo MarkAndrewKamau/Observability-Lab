@@ -73,13 +73,13 @@ flowchart TB
 
     subgraph collect["Collection layer"]
         otelcol["OTel Collector ✅"]
-        fluent["Fluent Bit 🔜"]
-        prom["Prometheus 🔜"]
+        fluent["Fluent Bit ✅"]
+        prom["Prometheus ✅"]
     end
 
     subgraph store["Storage backends"]
         tempo[("Tempo ✅<br/>traces")]
-        loki[("Loki 🔜<br/>operational logs")]
+        loki[("Loki ✅<br/>operational logs")]
         wazuh[("Wazuh 🔜<br/>security events")]
     end
 
@@ -211,7 +211,7 @@ flowchart LR
 | Alertmanager | kube-prometheus-stack | SLO burn-rate alert routing | ✅ (rules P10) | in-cluster |
 | Grafana | kube-prometheus-stack | Dashboards, Explore, RBAC | ✅ | both |
 | Loki | Grafana Loki | Operational log storage | ✅ (shipping P7) | in-cluster |
-| Fluent Bit | Fluent Bit | Log shipping, routing by `stream` | 🔜 P7 | in-cluster |
+| Fluent Bit | Fluent Bit | Log shipping, routing by `stream` | ✅ P7 | in-cluster |
 | Wazuh | Wazuh | Security/auth event SIEM | 🔜 P8 | in-cluster |
 
 ---
@@ -335,11 +335,17 @@ bash scripts/smoke.sh          # drives a full order + asserts trace + masking
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
+sudo bash scripts/tune-inotify.sh   # host fs.inotify limits (kube-proxy EMFILE fix)
 make kind-up                   # 3-node cluster (control-plane + 2 workers)
 make images                    # build gateway/orders/worker images
 make kind-load                 # load images into the cluster
 # Phase 5: terraform apply deploys the full stack
 ```
+
+> **Host prerequisite**: `scripts/tune-inotify.sh` raises `fs.inotify.max_user_instances`
+> (128 → 1024). Without it, kube-proxy crash-loops with EMFILE (inotify instances
+> exhausted by the kind nodes + app stack), which breaks ClusterIP/DNS on the node
+> and wedges the Wazuh dashboard into a CrashLoop that looks like an OOM.
 
 ---
 
@@ -393,8 +399,8 @@ Full detail and current status live in **[docs/PLAN.md](docs/PLAN.md)**.
 | 4 | Containerize & kind | ✅ |
 | 5 | Terraform + Helm (full stack, dev/prod) | ✅ |
 | 6 | Metrics, Grafana, Alertmanager | ✅ |
-| 7 | Fluent Bit logging pipeline → Loki | 🔜 next |
-| 8 | Wazuh security events | ⬜ |
+| 7 | Fluent Bit logging pipeline → Loki | ✅ |
+| 8 | Wazuh security events | 🔜 next |
 | 9 | Custom Go log exporter | ⬜ |
 | 10 | SLOs & burn-rate alerts | ⬜ |
 | 11 | RBAC & masking proof | ⬜ |

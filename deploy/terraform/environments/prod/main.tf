@@ -17,14 +17,17 @@ module "datastores" {
 }
 
 module "observability" {
-  source                 = "../../modules/observability"
-  namespace              = local.mon_namespace
-  grafana_admin_password = var.grafana_admin_password
-  grafana_nodeport       = 30030
-  prometheus_retention   = var.prometheus_retention
-  prometheus_resources   = var.prometheus_resources
-  persistence_enabled    = var.persistence_enabled
-  fluent_bit_resources   = var.fluent_bit_resources
+  source                    = "../../modules/observability"
+  namespace                 = local.mon_namespace
+  grafana_admin_password    = var.grafana_admin_password
+  grafana_nodeport          = 30030
+  prometheus_retention      = var.prometheus_retention
+  prometheus_resources      = var.prometheus_resources
+  persistence_enabled       = var.persistence_enabled
+  fluent_bit_resources      = var.fluent_bit_resources
+  wazuh_indexer_resources   = var.wazuh_indexer_resources
+  wazuh_manager_resources   = var.wazuh_manager_resources
+  wazuh_dashboard_resources = var.wazuh_dashboard_resources
 }
 
 module "app" {

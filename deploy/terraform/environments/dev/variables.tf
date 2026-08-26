@@ -60,3 +60,15 @@ variable "fluent_bit_resources" {
   type    = any
   default = {}
 }
+variable "wazuh_indexer_resources" {
+  type    = any
+  default = {}
+}
+variable "wazuh_manager_resources" {
+  type    = any
+  default = {}
+}
+variable "wazuh_dashboard_resources" {
+  type    = any
+  default = {}
+}

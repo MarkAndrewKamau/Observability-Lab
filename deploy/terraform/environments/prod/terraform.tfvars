@@ -33,5 +33,20 @@ fluent_bit_resources = {
   limits   = { cpu = "500m", memory = "512Mi" }
 }
 
+# Wazuh SIEM: single indexer/manager (a real prod would use 3 indexers + a
+# worker pool), prod-sized resources and persistent storage.
+wazuh_indexer_resources = {
+  requests = { cpu = "500m", memory = "1Gi" }
+  limits   = { cpu = "2000m", memory = "2Gi" }
+}
+wazuh_manager_resources = {
+  requests = { cpu = "500m", memory = "1Gi" }
+  limits   = { cpu = "2000m", memory = "2Gi" }
+}
+wazuh_dashboard_resources = {
+  requests = { cpu = "250m", memory = "512Mi" }
+  limits   = { cpu = "1000m", memory = "1Gi" }
+}
+
 service_monitor_enabled = true
 loadgen_enabled         = false

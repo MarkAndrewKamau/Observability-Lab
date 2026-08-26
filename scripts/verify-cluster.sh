@@ -9,6 +9,8 @@
 #   5. Prometheus scrapes gateway/orders/worker and transaction metrics flow
 #   6. Fluent Bit tails every node and ships logs to Loki, routed by the app's
 #      stream field (operational vs security)
+#   7. Wazuh manager/indexer/dashboard are up and a security-stream auth
+#      failure lands as an alert in the Wazuh indexer
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 NS_APP=obs
@@ -99,6 +101,39 @@ print(sum(len(s['values']) for s in d))
 op=$(loki_count '{stream="operational"} |= "creating order"')
 [ "${op:-0}" -gt 0 ] && echo "PASS: $op operational log lines in Loki" \
   || echo "FAIL: no operational logs in Loki"
-sec=$(loki_count '{stream="security"} |= "authentication"')
-[ "${sec:-0}" -gt 0 ] && echo "PASS: $sec security log lines in Loki" \
-  || echo "FAIL: no security logs in Loki"
+# Security-stream lines are routed to Wazuh (UDP/514) since Phase 8; they are
+# verified end-to-end as alerts in step 12 below, not in Loki.
+
+echo "== 10) drive an auth failure to feed the Wazuh security stream =="
+curl -s -o /dev/null -w "status=%{http_code}\n" -X POST "$GW_URL/api/orders" \
+  -H "Authorization: Bearer wrong-token" -H "Content-Type: application/json" \
+  -d '{"customer_id":"cust-k8s","amount_cents":100,"currency":"USD","card_number":"4111 1111 1111 1111","phone":"+254712345678"}'
+
+echo "== 11) Wazuh manager / indexer / dashboard ready =="
+kubectl -n "$NS_MON" rollout status sts/wazuh-manager-master --timeout=600s >/dev/null || { echo "FAIL: wazuh manager not ready"; exit 1; }
+kubectl -n "$NS_MON" rollout status sts/wazuh-indexer --timeout=600s >/dev/null || { echo "FAIL: wazuh indexer not ready"; exit 1; }
+kubectl -n "$NS_MON" rollout status deploy/wazuh-dashboard --timeout=600s >/dev/null || { echo "FAIL: wazuh dashboard not ready"; exit 1; }
+echo "PASS: wazuh manager, indexer and dashboard are Running"
+
+echo "== 12) security alert ingested into the Wazuh indexer =="
+kubectl -n "$NS_MON" port-forward svc/wazuh-indexer 9200:9200 >/tmp/wazuh-pf.log 2>&1 &
+WP=$!; trap "kill $PF $PP $LP $WP 2>/dev/null" EXIT
+for i in $(seq 1 30); do
+  curl -sk https://localhost:9200/_cluster/health >/dev/null 2>&1 && break
+  sleep 5
+done
+hits=0
+for i in $(seq 1 24); do
+  hits=$(curl -sk -u admin:WazuhSecretPassword \
+    'https://localhost:9200/wazuh-alerts-*/_search?size=1' \
+    -H 'Content-Type: application/json' \
+    -d '{"query":{"query_string":{"query":"authentication failed"}}}' \
+    2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin)["hits"]["total"]["value"])' 2>/dev/null)
+  [ "${hits:-0}" -gt 0 ] && break
+  sleep 10
+done
+if [ "${hits:-0}" -gt 0 ]; then
+  echo "PASS: $hits security alert(s) from the gateway in Wazuh"
+else
+  echo "FAIL: no security alert reached the Wazuh indexer"
+fi

@@ -32,3 +32,18 @@ fluent_bit_resources = {
   requests = { cpu = "25m", memory = "64Mi" }
   limits   = { cpu = "250m", memory = "256Mi" }
 }
+
+# Phase 8: Wazuh SIEM — single indexer, single manager master, dashboard.
+# Dev is trimmed so it fits the lab machine alongside everything else.
+wazuh_indexer_resources = {
+  requests = { cpu = "250m", memory = "768Mi" }
+  limits   = { cpu = "1000m", memory = "1536Mi" }
+}
+wazuh_manager_resources = {
+  requests = { cpu = "250m", memory = "512Mi" }
+  limits   = { cpu = "1000m", memory = "1024Mi" }
+}
+wazuh_dashboard_resources = {
+  requests = { cpu = "250m", memory = "512Mi" }
+  limits   = { cpu = "1000m", memory = "1536Mi" }
+}

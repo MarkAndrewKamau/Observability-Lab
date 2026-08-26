@@ -70,9 +70,23 @@ after each phase we pause, review, and answer open questions before continuing.
       code Grafana dashboard (RED + transaction + queue panels) loaded via the
       sidecar; an in-cluster load generator drives continuous orders. Verified:
       `verify-cluster.sh` asserts targets UP and transaction metrics non-zero.
-- [ ] **Phase 7 — Logging pipeline.** Fluent Bit routing: operational → Loki,
-      auth/security → Wazuh.
-- [ ] **Phase 8 — Wazuh.** Manager/indexer/dashboard; security event ingestion.
+- [x] **Phase 7 — Logging pipeline.** Fluent Bit DaemonSet tails every node and
+      routes operational logs → Loki by the `stream` field each service stamps
+      on every line; AMQP client hardened with a background reconnector.
+      Verified: `verify-cluster.sh` checks 8–9 assert Fluent Bit is ready on
+      every node and operational/security log lines arrive in Loki. The
+      security stream's sink flips to Wazuh in Phase 8.
+- [x] **Phase 8 — Wazuh.** Manager/indexer/dashboard deployed via the Wazuh helm
+      chart (single manager master, single indexer, dashboard NodePort 30040,
+      cert-manager CRDs installed separately). Fluent Bit ships the security
+      stream to the manager on UDP/514 and a local rule (id 100010) turns the
+      gateway's `authentication failed` events into level-5 alerts in the
+      indexer. Verified: `verify-cluster.sh` checks 11–12 assert the stack is
+      Ready and an auth failure lands in `wazuh-alerts-*`.
+      **Not an OOM**: the wazuh pods never actually OOM'd — kube-proxy crash-looped
+      with EMFILE (host fs.inotify instances exhausted), which broke
+      ClusterIP/DNS and wedged the dashboard into a CrashLoop that looked like
+      an OOM. Fixed with `scripts/tune-inotify.sh` (see README).
 - [ ] **Phase 9 — Custom Go exporter.** `logparser` masks PII and exports
       `masked_pii_events_total` and log-derived RED metrics.
 - [ ] **Phase 10 — SLOs & burn-rate alerts.** Order success-rate and latency
